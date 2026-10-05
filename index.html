@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Calibration Deck</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f111a; color: #e4e7eb; text-align: center; padding: 20px; }
+        .container { max-width: 550px; background: #1a1d29; margin: auto; padding: 25px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); margin-bottom: 20px;}
+        .ip-bar { display: flex; gap: 10px; margin-bottom: 25px; }
+        input[type=text] { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #2d3142; background: #0f111a; color: #fff; text-align: center; font-size: 1rem; }
+        button { padding: 10px 20px; background: #00adb5; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; }
+        button:hover { background: #008f95; }
+        .slider-block { margin: 24px 0; text-align: left; }
+        label { font-weight: 600; display: block; margin-bottom: 8px; color: #00adb5; }
+        input[type=range] { width: 100%; height: 7px; background: #2d3142; border-radius: 5px; outline: none; transition: background 0.2s; }
+        .num-label { float: right; color: #ffffff; font-weight: bold; }
+        .rc-box { border: 2px dashed #00adb5; padding: 20px; border-radius: 12px; background: #141620; }
+        .rc-title { color: #00adb5; font-size: 1.2rem; margin-top: 0; }
+        .telemetry { display: flex; justify-content: space-around; border-top: 2px solid #2d3142; margin-top: 25px; padding-top: 20px; }
+        .stat-val { font-size: 1.5rem; font-weight: bold; color: #ff2e63; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2> Balancing Tuning Deck</h2>
+    <div class="ip-bar">
+        <input type="text" id="ipAddress" value="-------------------------------------" placeholder="Enter Robot IP Address">
+        <button onclick="saveIP()">Link IP</button>
+    </div>
+
+    <div class="slider-block">
+        <label>Kp (Proportional): <span id="kp_lbl" class="num-label">100.0</span></label>
+        <input type="range" id="kp" min="0" max="500" step="0.5" value="100" oninput="pushParameters()">
+    </div>
+    <div class="slider-block">
+        <label>Ki (Integral): <span id="ki_lbl" class="num-label">0.0</span></label>
+        <input type="range" id="ki" min="0" max="20" step="0.1" value="0" oninput="pushParameters()">
+    </div>
+    <div class="slider-block">
+        <label>Kd (Derivative): <span id="kd_lbl" class="num-label">0.0</span></label>
+        <input type="range" id="kd" min="0" max="50" step="0.05" value="0" oninput="pushParameters()">
+    </div>
+    <div class="slider-block">
+        <label>Base Center Angle (°): <span id="target_lbl" class="num-label">1.0</span></label>
+        <input type="range" id="target" min="-10" max="10" step="0.1" value="1" oninput="pushParameters()">
+    </div>
+
+    <div class="telemetry">
+        <div><div>Orientation</div><div id="ui_angle" class="stat-val">0.0°</div></div>
+        <div><div>Battery Level</div><div id="ui_batt" class="stat-val">0.00V</div></div>
+        <div><div>WiFi Signal</div><div id="ui_rssi" class="stat-val">0 dBm</div></div>
+    </div>
+</div>
+
+<div class="container rc-box">
+    <h3 class="rc-title"> RC Drive Controls</h3>
+    <div class="slider-block">
+        <label>Drive (Forward/Reverse): <span id="move_lbl" class="num-label">0.0°</span></label>
+        <input type="range" id="move" min="-5" max="5" step="0.1" value="0" 
+               oninput="pushMovement()" onmouseup="resetRC()" ontouchend="resetRC()">
+    </div>
+    <div class="slider-block">
+        <label>Steer (Left/Right): <span id="turn_lbl" class="num-label">0</span></label>
+        <input type="range" id="turn" min="-100" max="100" step="1" value="0" 
+               oninput="pushMovement()" onmouseup="resetRC()" ontouchend="resetRC()">
+    </div>
+    <p style="color: #6c757d; font-size: 0.85rem; margin-bottom: 0;">Sliders spring back to center when released.</p>
+</div>
+
+<script>
+    let robotIP = localStorage.getItem('robot_ip') || "--------------------------"; 
+    document.getElementById('ipAddress').value = robotIP;
+
+    function saveIP() {
+        robotIP = document.getElementById('ipAddress').value.trim();
+        localStorage.setItem('robot_ip', robotIP);
+        alert("Target connection point set to: " + robotIP);
+    }
+
+    function pushParameters() {
+        let kp = document.getElementById('kp').value;
+        let ki = document.getElementById('ki').value;
+        let kd = document.getElementById('kd').value;
+        let target = document.getElementById('target').value;
+
+        document.getElementById('kp_lbl').innerText = kp;
+        document.getElementById('ki_lbl').innerText = ki;
+        document.getElementById('kd_lbl').innerText = kd;
+        document.getElementById('target_lbl').innerText = target;
+
+        fetch(`http://${robotIP}/set_pid?Kp=${kp}&Ki=${ki}&Kd=${kd}&Target=${target}`, { mode: 'cors' }).catch(() => {});
+    }
+
+    function pushMovement() {
+        let moveVal = document.getElementById('move').value;
+        let turnVal = document.getElementById('turn').value;
+        
+        document.getElementById('move_lbl').innerText = moveVal + '°';
+        document.getElementById('turn_lbl').innerText = turnVal;
+
+        fetch(`http://${robotIP}/control?move=${moveVal}&turn=${turnVal}`, { mode: 'cors' }).catch(() => {});
+    }
+
+    function resetRC() {
+        document.getElementById('move').value = 0;
+        document.getElementById('turn').value = 0;
+        pushMovement();
+    }
+
+    setInterval(() => {
+        if(!robotIP) return;
+        fetch(`http://${robotIP}/telemetry`, { mode: 'cors' })
+            .then(res => res.json())
+            .then(data => {
+                if(data.angle !== undefined) document.getElementById('ui_angle').innerText = data.angle.toFixed(1) + '°';
+                if(data.battery !== undefined) document.getElementById('ui_batt').innerText = data.battery.toFixed(2) + 'V';
+                if(data.rssi !== undefined) document.getElementById('ui_rssi').innerText = data.rssi + ' dBm'; 
+            }).catch(() => {});
+    }, 100);
+</script>
+</body>
+</html>
